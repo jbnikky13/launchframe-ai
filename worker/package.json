@@ -1,0 +1,7 @@
+{
+  "name": "launchframe-render-worker",
+  "private": true,
+  "type": "module",
+  "scripts": { "render": "tsx worker/entry.ts" },
+  "dependencies": { "tsx": "^4.20.3", "typescript": "^5.9.2" }
+}

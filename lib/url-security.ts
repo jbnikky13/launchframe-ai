@@ -1,0 +1,4 @@
+import dns from 'node:dns/promises';
+import net from 'node:net';
+function blocked(ip:string){const v=net.isIP(ip);if(v===4){const p=ip.split('.').map(Number);return p[0]===10||p[0]===127||(p[0]===169&&p[1]===254)||(p[0]===172&&p[1]>=16&&p[1]<=31)||(p[0]===192&&p[1]===168)}if(v===6)return ip==='::1'||ip.startsWith('fc')||ip.startsWith('fd')||ip.startsWith('fe80:');return true}
+export async function validateProjectUrl(raw:string){const u=new URL(raw);if(!['http:','https:'].includes(u.protocol))throw new Error('Only HTTP(S) project URLs are allowed.');if(u.username||u.password)throw new Error('Credential URLs are not allowed.');const hosts=await dns.lookup(u.hostname,{all:true});if(!hosts.length||hosts.some(h=>blocked(h.address)))throw new Error('This destination is not allowed.');return u.toString()}

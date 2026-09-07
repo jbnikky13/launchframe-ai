@@ -2,6 +2,6 @@
   "name": "launchframe-render-worker",
   "private": true,
   "type": "module",
-  "scripts": { "render": "tsx worker/entry.ts" },
-  "dependencies": { "tsx": "^4.20.3", "typescript": "^5.9.2" }
+  "scripts": { "render": "tsx worker/entry.ts", "start": "tsx worker/index.ts" },
+  "dependencies": { "@supabase/supabase-js": "^2.57.0", "tsx": "^4.20.3", "typescript": "^5.9.2" }
 }

@@ -1,0 +1,2 @@
+export const RENDER_LIMITS={maxScenes:12,maxDurationSeconds:90,maxUploadBytes:10*1024*1024,maxRetries:2,jobTimeoutMs:10*60*1000};
+export function validatePlan(plan:any){if(!plan||!Array.isArray(plan.scenes)||plan.scenes.length<1||plan.scenes.length>RENDER_LIMITS.maxScenes)throw new Error('Invalid scene count.');const duration=plan.scenes.reduce((n:number,s:any)=>n+Number(s.duration||0),0);if(duration>RENDER_LIMITS.maxDurationSeconds)throw new Error('Render duration limit exceeded.');return plan}

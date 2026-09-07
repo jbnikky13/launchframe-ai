@@ -3,6 +3,8 @@
 import { FormEvent, useState } from 'react';
 
 type Analysis = { title: string; description: string; features: string[]; hook: string; benefit: string; cta: string; };
+type Scene = { order: number; duration: number; purpose: string; narration: string; visual: string; onScreenText: string; };
+type Brief = { angle: string; audience: string; hook: string; script: string; cta: string; scenes: Scene[]; };
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -10,21 +12,29 @@ export default function Home() {
   const [template, setTemplate] = useState('product-launch');
   const [status, setStatus] = useState('');
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [brief, setBrief] = useState<Brief | null>(null);
 
   async function analyze(e: FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
-    setAnalysis(null);
-    setStatus('Scraping and analyzing your project…');
+    setAnalysis(null); setBrief(null); setStatus('Scraping and analyzing your project…');
     try {
       const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
-      setAnalysis(data.analysis);
-      setStatus('Analysis complete — your video brief is ready.');
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Something went wrong.');
-    }
+      setAnalysis(data.analysis); setStatus('Analysis complete.');
+    } catch (err) { setStatus(err instanceof Error ? err.message : 'Something went wrong.'); }
+  }
+
+  async function generateCreative() {
+    if (!analysis) return;
+    setStatus('Building your marketing angle, script and storyboard…');
+    try {
+      const res = await fetch('/api/creative', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analysis, format, template }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Creative generation failed');
+      setBrief(data.brief); setStatus('Creative brief ready — review the storyboard below.');
+    } catch (err) { setStatus(err instanceof Error ? err.message : 'Creative generation failed.'); }
   }
 
   return (
@@ -36,8 +46,8 @@ export default function Home() {
         <p>LaunchFrame analyzes your website, finds the strongest selling points, writes the script, and prepares a video-ready creative brief.</p>
         <form className="card" onSubmit={analyze}>
           <label className="label">Project URL</label>
-          <div className="row"><input className="input" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://yourproject.com" type="url" required /><button className="primary" disabled={!url.trim()}>{status ? 'Analyze again' : 'Analyze project'}</button></div>
-          <div className="upload">📸 Optional screenshots — image upload pipeline coming next.</div>
+          <div className="row"><input className="input" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://yourproject.com" type="url" required /><button className="primary" disabled={!url.trim()}>Analyze project</button></div>
+          <div className="upload">📸 Optional screenshots — visual upload pipeline comes in the next stage.</div>
           <div className="controls">
             <select className="select" value={template} onChange={e => setTemplate(e.target.value)}><option value="product-launch">Product Launch</option><option value="saas-demo">SaaS Demo</option><option value="ai-product">AI Product</option><option value="mobile-app">Mobile App</option></select>
             <select className="select" value={format} onChange={e => setFormat(e.target.value)}><option value="vertical">Vertical · 9:16</option><option value="horizontal">Horizontal · 16:9</option><option value="square">Square · 1:1</option></select>
@@ -45,9 +55,16 @@ export default function Home() {
           {status && <div className="status">{status}</div>}
           {analysis && <div className="results">
             <div className="panel"><h3>{analysis.title}</h3><p>{analysis.description}</p><ul>{analysis.features.map((f, i) => <li key={i}>{f}</li>)}</ul></div>
-            <div className="panel"><h3>Generated creative</h3><p><strong>Hook:</strong> {analysis.hook}</p><p><strong>Benefit:</strong> {analysis.benefit}</p><p><strong>CTA:</strong> {analysis.cta}</p><p><strong>Format:</strong> {format} · <strong>Template:</strong> {template}</p></div>
+            <div className="panel"><h3>Project signals</h3><p><strong>Hook:</strong> {analysis.hook}</p><p><strong>Benefit:</strong> {analysis.benefit}</p><p><strong>CTA:</strong> {analysis.cta}</p></div>
           </div>}
-          <div className="footer">Rendering, voiceover, music, captions and MP4 export are the next pipeline stage.</div>
+          {analysis && !brief && <button type="button" className="primary full" onClick={generateCreative}>Generate script & storyboard →</button>}
+          {brief && <div className="creative">
+            <div className="panel"><h3>Marketing angle</h3><p>{brief.angle}</p><p><strong>Audience:</strong> {brief.audience}</p><p><strong>Hook:</strong> {brief.hook}</p></div>
+            <div className="panel"><h3>Voiceover script</h3><p>{brief.script}</p><p><strong>CTA:</strong> {brief.cta}</p></div>
+            <div className="panel storyboard"><h3>Storyboard · {brief.scenes.length} scenes</h3>{brief.scenes.map(scene => <div className="scene" key={scene.order}><div><strong>Scene {scene.order}</strong> · {scene.duration}s · {scene.purpose}</div><p>{scene.narration}</p><small>Visual: {scene.visual}</small><small>On-screen: {scene.onScreenText}</small></div>)}</div>
+            <button type="button" className="primary full">Continue to video assembly →</button>
+          </div>}
+          <div className="footer">Next pipeline: screenshots → templates → voiceover → music → async rendering → MP4.</div>
         </form>
       </section>
     </main>

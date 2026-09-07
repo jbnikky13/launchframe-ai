@@ -1,21 +1,3 @@
-export type ProjectAsset = {
-  id: string;
-  name: string;
-  url: string;
-  kind: 'screenshot' | 'image';
-  mimeType?: string;
-};
-
-export function normalizeAssets(input: unknown): ProjectAsset[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
-    .map((item, index) => ({
-      id: typeof item.id === 'string' ? item.id : `asset-${index + 1}`,
-      name: typeof item.name === 'string' ? item.name : `Screenshot ${index + 1}`,
-      url: typeof item.url === 'string' ? item.url : '',
-      kind: item.kind === 'image' ? 'image' : 'screenshot',
-      mimeType: typeof item.mimeType === 'string' ? item.mimeType : undefined
-    }))
-    .filter(asset => asset.url);
-}
+export type ProjectAsset={id:string;name:string;url:string;kind:'screenshot'|'image'|'website_capture';mimeType?:string;selected?:boolean};
+export function normalizeAssets(input:unknown):ProjectAsset[]{if(!Array.isArray(input))return[];return input.filter((x):x is Record<string,unknown>=>!!x&&typeof x==='object').map((x,i)=>({id:typeof x.id==='string'?x.id:`asset-${i+1}`,name:typeof x.name==='string'?x.name:`Screenshot ${i+1}`,url:typeof x.url==='string'?x.url:'',kind:x.kind==='image'||x.kind==='website_capture'?'image': 'screenshot',mimeType:typeof x.mimeType==='string'?x.mimeType:undefined,selected:true})).filter(a=>a.url)}
+export function selectAssetsForScenes(assets:ProjectAsset[],scenes:Array<{id:string;purpose:string;visual:string}>){const available=assets.filter(a=>a.selected!==false);return scenes.map((scene,index)=>{if(!available.length)return{sceneId:scene.id,reason:'No project asset available; use generated background.'};const text=`${scene.purpose} ${scene.visual}`.toLowerCase();const preferred=available.find(a=>text.includes('hero')&&a.name.toLowerCase().includes('hero'))||available.find(a=>text.includes('dashboard')&&a.name.toLowerCase().includes('dashboard'))||available[index%available.length];return{sceneId:scene.id,assetId:preferred.id,reason:`Selected ${preferred.kind} for this scene.`};});}

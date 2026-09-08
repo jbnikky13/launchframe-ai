@@ -14,7 +14,8 @@ async function makePuppetFrames(scene: Scene, outDir: string, fps = 12) {
   await mkdir(frameDir, { recursive:true });
   const action = puppetActionForStickman(scene.stickAction);
   for (let i = 0; i < frames; i++) {
-    const svg = puppetSvg({ action, emotion: scene.stickAction === 'confused' ? 'confused' : scene.stickAction === 'celebrating' ? 'happy' : 'neutral', phase: i / Math.max(1, frames - 1), width: 420, height: 620 });
+    const phase = i / Math.max(1, frames - 1);
+    const svg = puppetSvg({ action, emotion: scene.stickAction === 'confused' ? 'confused' : scene.stickAction === 'celebrating' ? 'happy' : 'neutral', phase, width: 420, height: 620 });
     const svgPath = `${frameDir}/frame-${String(i).padStart(4,'0')}.svg`;
     const pngPath = `${frameDir}/frame-${String(i).padStart(4,'0')}.png`;
     await writeFile(svgPath, svg, 'utf8');
@@ -35,15 +36,21 @@ export async function renderScene(plan: RenderPlan, scene: Scene, index: number,
   if (scene.assetUrl) inputs.push('-stream_loop','-1','-i',scene.assetUrl);
   else inputs.push('-f','lavfi','-i',`color=c=0x808080:s=${plan.width}x${plan.height}:r=${plan.fps}`);
 
-  let filter = `[0:v]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=decrease,pad=${plan.width}:${plan.height}:(ow-iw)/2:(oh-ih)/2[bg]`;
-  let maps = '[out0]';
+  const d = Math.max(0.2, scene.duration);
+  let filter = `[0:v]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=decrease,pad=${plan.width}:${plan.height}:(ow-iw)/2:(oh-ih)/2[bg0]`;
+  // Subtle camera push-in gives the otherwise simple puppet scenes more short-form energy.
+  filter += `;[bg0]scale=w='iw*(1+0.045*t/${d})':h='ih*(1+0.045*t/${d})',crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`;
 
+  let maps = '[out0]';
   if (scene.stickman && scene.stickAction) {
     const frameDir = await makePuppetFrames(scene, outDir);
     inputs.push('-framerate','12','-i',`${frameDir}/frame-%04d.png`);
-    filter += `;[1:v]scale=${Math.round(plan.width*.24)}:-1[char];[bg][char]overlay=x=(W-w)/2:y=H-h-70:shortest=0[out0]`;
+    // Enter from the side for walking/presenting scenes, then settle into the center.
+    const enter = scene.stickAction === 'presenting' || scene.stickAction === 'walk';
+    const xExpr = enter ? `(W-w)/2-260+min(260\,260*t/${Math.min(0.8,d)})` : `(W-w)/2`;
+    filter += `;[1:v]scale=${Math.round(plan.width*.24)}:-1,format=rgba[char];[bg][char]overlay=x='${xExpr}':y=H-h-70:shortest=0,fade=t=in:st=0:d=0.16[out0]`;
   } else {
-    filter += ';[bg]null[out0]';
+    filter += `;[bg]fade=t=in:st=0:d=0.16[out0]`;
   }
 
   let captionPath: string | undefined;

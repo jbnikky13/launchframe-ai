@@ -30,8 +30,9 @@ const dimensions: Record<VideoFormat, [number, number]> = { vertical: [1080, 192
 export function createVideoPlan(input: { format: VideoFormat; template: string; scenes: Array<{ order:number; duration:number; purpose:string; narration:string; visual:string; onScreenText:string }>; assetUrls?: string[] }): VideoPlan {
   const [width, height] = dimensions[input.format];
   const assets = input.assetUrls || [];
+  const puppetTemplate = /puppet|stick|2d-story/i.test(input.template);
   const scenes = input.scenes.map((scene, index) => {
-    const action = inferCharacterAction(scene.purpose, index);
+    const action = inferCharacterAction(scene.purpose, index, puppetTemplate);
     const useCharacter = action !== null;
     return {
       id: `scene-${scene.order}`, duration: scene.duration, purpose: scene.purpose, narration: scene.narration,
@@ -43,11 +44,12 @@ export function createVideoPlan(input: { format: VideoFormat; template: string; 
   return { format: input.format, template: input.template, width, height, totalDuration: scenes.reduce((sum,s)=>sum+s.duration,0), scenes };
 }
 
-function inferCharacterAction(purpose: string, index: number): StickAction | null {
+function inferCharacterAction(purpose: string, index: number, puppetTemplate = false): StickAction | null {
   const value = purpose.toLowerCase();
-  if (value.includes('problem')) return 'confused';
-  if (value.includes('feature')) return 'pointing';
-  if (value.includes('benefit')) return 'celebrating';
-  if (value.includes('hook') && index % 2 === 0) return 'presenting';
-  return null;
+  if (value.includes('problem') || value.includes('pain') || value.includes('conflict')) return 'confused';
+  if (value.includes('feature') || value.includes('show') || value.includes('point')) return 'pointing';
+  if (value.includes('benefit') || value.includes('result') || value.includes('success')) return 'celebrating';
+  if (value.includes('think') || value.includes('question')) return 'thinking';
+  if (value.includes('hook') || value.includes('intro')) return index % 2 === 0 ? 'presenting' : 'pointing';
+  return puppetTemplate ? (index % 3 === 0 ? 'thinking' : 'presenting') : null;
 }

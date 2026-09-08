@@ -1,0 +1,17 @@
+services:
+  launchframe-worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: launchframe-worker
+    restart: unless-stopped
+    env_file:
+      - .env.worker
+    init: true
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "node --import tsx worker/healthcheck.ts"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s

@@ -1,4 +1,4 @@
-export type StickAction = 'presenting' | 'thinking' | 'confused' | 'pointing' | 'celebrating';
+export type StickAction = 'presenting' | 'thinking' | 'confused' | 'pointing' | 'celebrating' | 'talking';
 
 export type StickCharacter = {
   enabled: boolean;
@@ -8,12 +8,6 @@ export type StickCharacter = {
   scale: number;
 };
 
-/**
- * Lightweight procedural character specification. The renderer can turn this
- * into SVG/Canvas frames without requiring a character asset or external API.
- * This keeps the video pipeline deterministic and makes stick characters easy
- * to place beside screenshots, captions and UI callouts.
- */
 export function createStickCharacter(action: StickAction, index = 0): StickCharacter {
   const emotion = action === 'confused' ? 'confused' : action === 'celebrating' ? 'happy' : action === 'thinking' ? 'curious' : 'neutral';
   const positions: StickCharacter['position'][] = ['left', 'right', 'center'];
@@ -36,10 +30,8 @@ export function stickmanSvg(character: StickCharacter, width = 420, height = 620
         : action === 'confused'
           ? `M ${x} 205 L ${x - 105} 235 M ${x} 205 L ${x + 90} 230`
           : `M ${x} 205 L ${x - 95} 250 M ${x} 205 L ${x + 95} 250`;
-
   const face = character.emotion === 'confused'
     ? `<path d="M ${x - 24} 112 Q ${x - 8} 100 ${x + 8} 112" fill="none" stroke="${stroke}" stroke-width="6"/><circle cx="${x - 15}" cy="90" r="4"/><circle cx="${x + 18}" cy="90" r="4"/>`
     : `<circle cx="${x - 16}" cy="92" r="4"/><circle cx="${x + 16}" cy="92" r="4"/><path d="M ${x - 20} 116 Q ${x} ${character.emotion === 'happy' ? 135 : 126} ${x + 20} 116" fill="none" stroke="${stroke}" stroke-width="6"/>`;
-
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><g transform="translate(0,0) scale(${character.scale})" fill="none" stroke="${stroke}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><circle cx="${x}" cy="${headY}" r="55" fill="white"/>${face}<path d="M ${x} ${bodyTop} L ${x} ${bodyBottom}"/><path d="${arm}"/><path d="M ${x} ${bodyBottom} L ${x - 80} 505 M ${x} ${bodyBottom} L ${x + 80} 505"/></g></svg>`;
 }

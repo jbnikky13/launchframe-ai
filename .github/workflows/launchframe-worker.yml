@@ -1,0 +1,49 @@
+name: LaunchFrame Worker
+
+on:
+  schedule:
+    # GitHub's minimum scheduled interval is 5 minutes.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: launchframe-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg librsvg2-bin fonts-dejavu chromium
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package.json
+
+      - name: Install worker dependencies
+        working-directory: worker
+        run: npm install --omit=dev
+
+      - name: Process one render job
+        run: npx tsx worker/run-once.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_TTS_MODEL: ${{ secrets.GEMINI_TTS_MODEL }}
+          GEMINI_TTS_VOICE: ${{ secrets.GEMINI_TTS_VOICE }}
+          VOICE_VOLUME: ${{ secrets.VOICE_VOLUME }}

@@ -1,8 +1,12 @@
 name: LaunchFrame Worker
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/launchframe-worker.yml'
   schedule:
-    # GitHub's minimum scheduled interval is 5 minutes.
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -19,8 +23,17 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout latest main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify worker revision
+        run: |
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Branch: $(git branch --show-current)"
+          grep -n "MAX_RUNTIME\|POLL_MS" worker/run-once.ts || true
 
       - name: Install rendering dependencies
         run: |
@@ -38,9 +51,15 @@ jobs:
         working-directory: worker
         run: npm install --omit=dev
 
-      - name: Process one render job
+      - name: Process queued render jobs
         working-directory: worker
-        run: npx tsx run-once.ts
+        run: |
+          # Each invocation polls for a short window. Repeating it keeps a
+          # scheduled runner alive long enough to catch jobs created after startup.
+          for attempt in 1 2 3 4 5; do
+            echo "[LaunchFrame] Worker pass $attempt/5"
+            npx tsx run-once.ts || true
+          done
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

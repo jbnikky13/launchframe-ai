@@ -13,13 +13,12 @@ async function main() {
     files.push(await renderScene(plan, scene, index));
   }
   const silentOutput = await concatScenes(files, './tmp/render/silent.mp4');
-  const narrationText = plan.scenes.map(scene => scene.narration?.trim()).filter(Boolean).join(' ');
+  const narrationText = plan.scenes.map(scene => (scene as { narration?: string; voiceover?: string }).narration ?? (scene as { voiceover?: string }).voiceover ?? '').map(text => text.trim()).filter(Boolean).join(' ');
   let output = silentOutput;
   try {
     const narration = await generateGeminiNarration(narrationText);
     if (narration) output = await mixAudio(silentOutput, { voiceoverPath: narration, voiceVolume: 1 }, './tmp/render/final.mp4');
   } catch (error) {
-    // Keep rendering usable without TTS; the silent MP4 is still a valid result.
     console.warn(`TTS unavailable; returning silent video: ${error instanceof Error ? error.message : String(error)}`);
   }
   process.stdout.write(`Completed: ${output}\n`);

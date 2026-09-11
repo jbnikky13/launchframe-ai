@@ -6,6 +6,8 @@ on:
     paths:
       - 'worker/**'
       - '.github/workflows/launchframe-worker.yml'
+  repository_dispatch:
+    types: [launchframe-render]
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
@@ -54,8 +56,6 @@ jobs:
       - name: Process queued render jobs
         working-directory: worker
         run: |
-          # Poll repeatedly so jobs created shortly after the runner starts are caught.
-          # Do not hide failures: a failed render must fail the workflow and remain visible in Actions.
           for attempt in 1 2 3 4 5; do
             echo "[LaunchFrame] Worker pass $attempt/5"
             npx tsx run-once.ts

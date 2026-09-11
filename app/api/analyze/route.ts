@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
-function clean(value: string | undefined) {
-  return (value || '').replace(/\s+/g, ' ').trim();
-}
+function clean(value: string | undefined) { return (value || '').replace(/\s+/g, ' ').trim(); }
+function absolute(base: URL, value?: string) { if (!value) return null; try { return new URL(value, base).toString(); } catch { return null; } }
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +11,7 @@ export async function POST(request: Request) {
     const parsed = new URL(url);
     if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Only http and https URLs are supported.');
 
-    const response = await fetch(parsed.toString(), { headers: { 'User-Agent': 'LaunchFrameBot/0.1 (+project-analysis)' }, redirect: 'follow', signal: AbortSignal.timeout(12000) });
+    const response = await fetch(parsed.toString(), { headers: { 'User-Agent': 'LaunchFrameBot/0.2 (+project-analysis)' }, redirect: 'follow', signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error(`The project returned HTTP ${response.status}.`);
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -24,6 +23,19 @@ export async function POST(request: Request) {
     const links = $('a').map((_, el) => clean($(el).text())).get().filter(t => t.length > 2 && t.length < 80);
     const features = [...new Set([...headings, ...links])].slice(0, 5);
 
+    const imageCandidates: string[] = [];
+    const addImage = (value?: string) => { const u = absolute(parsed, value); if (u && !imageCandidates.includes(u)) imageCandidates.push(u); };
+    addImage($('meta[property="og:image"]').attr('content'));
+    addImage($('meta[name="twitter:image"]').attr('content'));
+    addImage($('meta[property="og:image:url"]').attr('content'));
+    $('img').each((_, el) => {
+      addImage($(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src'));
+      const srcset = $(el).attr('srcset') || $(el).attr('data-srcset');
+      if (srcset) addImage(srcset.split(',')[0]?.trim().split(/\s+/)[0]);
+    });
+    $('source').each((_, el) => addImage($(el).attr('src')));
+    const images = imageCandidates.filter(u => !/\.svg(?:\?|$)/i.test(u)).slice(0, 8);
+
     const analysis = {
       title,
       description,
@@ -33,7 +45,7 @@ export async function POST(request: Request) {
       cta: `Try ${title} today.`
     };
 
-    return NextResponse.json({ analysis, source: { url: parsed.toString(), images: $('meta[property="og:image"]').attr('content') ? [$('meta[property="og:image"]').attr('content')] : [] } });
+    return NextResponse.json({ analysis, source: { url: parsed.toString(), images } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to analyze this project.';
     return NextResponse.json({ error: message }, { status: 422 });

@@ -8,24 +8,16 @@ if (!supabaseUrl || !serviceRoleKey) {
 }
 
 const client = createWorkerClient({ supabaseUrl, serviceRoleKey });
-const attempts = 5;
-const waitMs = 30_000;
 
-for (let attempt = 1; attempt <= attempts; attempt++) {
-  const job = await claimNextJob(client);
+// A dispatch is already the signal that a job exists. Do not poll for minutes:
+// claim immediately and let the scheduled workflow remain the safety net.
+const job = await claimNextJob(client);
 
-  if (job) {
-    console.log(`[LaunchFrame] Claimed job ${job.id}`);
-    const outputUrl = await processJob(client, job);
-    console.log(`[LaunchFrame] Completed job ${job.id}: ${outputUrl}`);
-    process.exit(0);
-  }
-
-  if (attempt < attempts) {
-    console.log(`[LaunchFrame] No queued job yet (${attempt}/${attempts}). Waiting ${waitMs / 1000}s...`);
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-  }
+if (!job) {
+  console.log('[LaunchFrame] No queued render job. Worker exiting.');
+  process.exit(0);
 }
 
-console.log('[LaunchFrame] No pending render jobs after polling window. Worker exiting normally.');
-process.exit(0);
+console.log(`[LaunchFrame] Claimed job ${job.id}; rendering immediately.`);
+const outputUrl = await processJob(client, job);
+console.log(`[LaunchFrame] Completed job ${job.id}: ${outputUrl}`);

@@ -48,13 +48,10 @@ function drawCaption(filter: string, captionPath: string | undefined, plan:Rende
   if (!captionPath) return filter;
   const long = scene.caption.trim().length > 34;
   const ticker = long && /feature|hook/i.test(scene.purpose || '');
-  const safeX = Math.round(plan.width * 0.08);
-  const maxChars = plan.width >= 1900 ? 42 : 28;
   const fontSize = scene.caption.length > 80 ? 42 : scene.caption.length > 50 ? 48 : 54;
   if (ticker) {
     const speed = Math.max(100, Math.min(220, plan.width / 7));
-    const tickerFilter = `[out0]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${captionPath}:fontcolor=white:fontsize=${fontSize}:box=1:boxcolor=black@0.42:boxborderw=22:x='W-mod(t*${speed}\\,W+text_w)':y=h-300[out]`;
-    return `${filter};${tickerFilter}`;
+    return `${filter};[out0]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${captionPath}:fontcolor=white:fontsize=${fontSize}:box=1:boxcolor=black@0.42:boxborderw=22:x='W-mod(t*${speed}\\,W+text_w)':y=h-300[out]`;
   }
   const wrappedPath = captionPath.replace('.txt','-wrapped.txt');
   return `${filter};[out0]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${wrappedPath}:fontcolor=white:fontsize=${fontSize}:line_spacing=12:box=1:boxcolor=black@0.48:boxborderw=24:x=(w-text_w)/2:y=h-360[out]`;
@@ -66,18 +63,17 @@ export async function renderScene(plan: RenderPlan, scene: Scene, index: number,
   const inputs: string[] = [];
   if (scene.assetUrl) inputs.push('-stream_loop','-1','-i',scene.assetUrl);
   else {
-    const [c1,c2] = templateColors(plan.template);
+    const [c1] = templateColors(plan.template);
     inputs.push('-f','lavfi','-i',`color=c=${c1}:s=${plan.width}x${plan.height}:r=${plan.fps}`);
   }
   const d = Math.max(0.2, scene.duration);
   let filter = `[0:v]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=decrease,pad=${plan.width}:${plan.height}:(ow-iw)/2:(oh-ih)/2[bg0]`;
   if (scene.assetUrl) filter += `;[bg0]scale=w='iw*(1+0.045*t/${d})':h='ih*(1+0.045*t/${d})':eval=frame,crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`;
-  else filter += `;[bg0]format=yuv420p[bg]`;
+  else filter += `;[bg0]null[bg]`;
   if (!scene.assetUrl && /product|saas|ai|mobile/i.test(plan.template)) {
     const [,c2] = templateColors(plan.template);
-    filter += `;[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${c2}@0.45:t=fill[bg1]`;
-  } else filter += ';[bg]copy[outbase]';
-  if (filter.endsWith('[bg1]')) filter += ';[bg1]copy[outbase]';
+    filter += `;[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${c2}@0.45:t=fill[bg1];[bg1]null[outbase]`;
+  } else filter += ';[bg]null[outbase]';
 
   if (scene.stickman && scene.stickAction) {
     const frameDir = await makePuppetFrames(scene, outDir);
@@ -97,7 +93,6 @@ export async function renderScene(plan: RenderPlan, scene: Scene, index: number,
     await writeFile(wrappedPath, wrapText(scene.caption, plan.width >= 1900 ? 42 : 28), 'utf8');
     filter = drawCaption(filter, captionPath, plan, scene);
   }
-  // Persistent brand mark on every template, with a safe margin.
   const brandPath = `${outDir}/${scene.id}-brand.txt`;
   await writeFile(brandPath, 'LAUNCHFRAME AI', 'utf8');
   filter += `;[${captionPath ? 'out' : 'out0'}]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${brandPath}:fontcolor=white@0.78:fontsize=${Math.max(22,Math.round(plan.width/55))}:x=${Math.round(plan.width*.06)}:y=${Math.round(plan.height*.055)}[final]`;

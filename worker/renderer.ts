@@ -38,14 +38,13 @@ export async function renderScene(plan: RenderPlan, scene: Scene, index: number,
 
   const d = Math.max(0.2, scene.duration);
   let filter = `[0:v]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=decrease,pad=${plan.width}:${plan.height}:(ow-iw)/2:(oh-ih)/2[bg0]`;
-  // Subtle camera push-in gives the otherwise simple puppet scenes more short-form energy.
-  filter += `;[bg0]scale=w='iw*(1+0.045*t/${d})':h='ih*(1+0.045*t/${d})',crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`;
+  // eval=frame is required because the zoom expression uses the per-frame time variable t.
+  filter += `;[bg0]scale=w='iw*(1+0.045*t/${d})':h='ih*(1+0.045*t/${d})':eval=frame,crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`;
 
   let maps = '[out0]';
   if (scene.stickman && scene.stickAction) {
     const frameDir = await makePuppetFrames(scene, outDir);
     inputs.push('-framerate','12','-i',`${frameDir}/frame-%04d.png`);
-    // Enter from the side for walking/presenting scenes, then settle into the center.
     const enter = scene.stickAction === 'presenting' || scene.stickAction === 'walk';
     const xExpr = enter ? `(W-w)/2-260+min(260\,260*t/${Math.min(0.8,d)})` : `(W-w)/2`;
     filter += `;[1:v]scale=${Math.round(plan.width*.24)}:-1,format=rgba[char];[bg][char]overlay=x='${xExpr}':y=H-h-70:shortest=0,fade=t=in:st=0:d=0.16[out0]`;

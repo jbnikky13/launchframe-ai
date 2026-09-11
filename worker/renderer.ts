@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { puppetActionForStickman, puppetSvg } from '../lib/puppet';
 
 const execFileAsync = promisify(execFile);
@@ -38,7 +39,6 @@ export async function renderScene(plan: RenderPlan, scene: Scene, index: number,
 
   const d = Math.max(0.2, scene.duration);
   let filter = `[0:v]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=decrease,pad=${plan.width}:${plan.height}:(ow-iw)/2:(oh-ih)/2[bg0]`;
-  // eval=frame is required because the zoom expression uses the per-frame time variable t.
   filter += `;[bg0]scale=w='iw*(1+0.045*t/${d})':h='ih*(1+0.045*t/${d})':eval=frame,crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`;
 
   let maps = '[out0]';
@@ -67,7 +67,9 @@ export async function renderScene(plan: RenderPlan, scene: Scene, index: number,
 export async function concatScenes(sceneFiles: string[], output = './tmp/render/launchframe.mp4') {
   const list = './tmp/render/concat.txt';
   await mkdir('./tmp/render',{recursive:true});
-  await writeFile(list, sceneFiles.map(file => `file '${file.replaceAll("'", "'\\''")}'`).join('\n'), 'utf8');
+  // ffmpeg resolves concat-list paths relative to the list file's directory.
+  // Store only basenames so ./tmp/render is not accidentally prefixed twice.
+  await writeFile(list, sceneFiles.map(file => `file '${basename(file).replaceAll("'", "'\\''")}'`).join('\n'), 'utf8');
   await execFileAsync('ffmpeg',['-y','-f','concat','-safe','0','-i',list,'-c','copy','-movflags','+faststart',output]);
   return output;
 }

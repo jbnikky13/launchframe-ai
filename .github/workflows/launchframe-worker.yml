@@ -54,11 +54,11 @@ jobs:
       - name: Process queued render jobs
         working-directory: worker
         run: |
-          # Each invocation polls for a short window. Repeating it keeps a
-          # scheduled runner alive long enough to catch jobs created after startup.
+          # Poll repeatedly so jobs created shortly after the runner starts are caught.
+          # Do not hide failures: a failed render must fail the workflow and remain visible in Actions.
           for attempt in 1 2 3 4 5; do
             echo "[LaunchFrame] Worker pass $attempt/5"
-            npx tsx run-once.ts || true
+            npx tsx run-once.ts
           done
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

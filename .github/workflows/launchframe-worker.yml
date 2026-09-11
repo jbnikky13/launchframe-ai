@@ -12,8 +12,10 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+# Do not cancel a running render. A database claim prevents two workers
+# from processing the same job, while dispatches can start a new runner.
 concurrency:
-  group: launchframe-worker
+  group: launchframe-render-${{ github.event.client_payload.job_id || github.run_id }}
   cancel-in-progress: false
 
 permissions:
@@ -34,8 +36,8 @@ jobs:
       - name: Verify worker revision
         run: |
           echo "Commit: $(git rev-parse HEAD)"
-          echo "Branch: $(git branch --show-current)"
-          grep -n "MAX_RUNTIME\|POLL_MS" worker/run-once.ts || true
+          echo "Event: ${{ github.event_name }}"
+          echo "Job ID: ${{ github.event.client_payload.job_id }}"
 
       - name: Install rendering dependencies
         run: |
@@ -47,19 +49,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: worker/package.json
+          cache-dependency-path: worker/package-lock.json
 
       - name: Install worker dependencies
         working-directory: worker
-        run: npm install --omit=dev
+        run: npm ci --omit=dev
 
-      - name: Process queued render jobs
+      - name: Process render immediately
         working-directory: worker
-        run: |
-          for attempt in 1 2 3 4 5; do
-            echo "[LaunchFrame] Worker pass $attempt/5"
-            npx tsx run-once.ts
-          done
+        run: npx tsx run-once.ts
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

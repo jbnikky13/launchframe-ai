@@ -31,49 +31,31 @@ function drawCaption(filter:string,captionPath:string|undefined,wrappedPath:stri
  const long=scene.caption.trim().length>34; const ticker=long&&/feature|hook|benefit|overview/i.test(scene.purpose||'');
  const fontSize=scene.caption.length>90?40:scene.caption.length>60?46:52;
  if(ticker){
-   const speed=Math.max(90,Math.min(180,plan.width/8)); const safeX=Math.round(plan.width*.07); const safeW=Math.round(plan.width*.86);
-   return `${filter};[out0]drawbox=x=${safeX}:y=h-330:w=${safeW}:h=150:color=black@0.58:t=fill[tickerbox];[tickerbox]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${captionPath}:fontcolor=white:fontsize=${fontSize}:x='${safeX}+${safeW}-mod(t*${speed}\\,${safeW}+text_w)':y=h-290[out]`;
+   const speed=Math.max(90,Math.min(180,plan.width/8)); const safeX=Math.round(plan.width*.07); const safeW=Math.round(plan.width*.86); const safeH=150; const safeY=plan.height-330;
+   return `${filter};[out0]drawbox=x=${safeX}:y=${safeY}:w=${safeW}:h=${safeH}:color=black@0.58:t=fill[tickerbase];color=c=black@0.0:s=${safeW}x${safeH}:r=${plan.fps}:d=${scene.duration},format=rgba,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${captionPath}:fontcolor=white:fontsize=${fontSize}:x='${safeW}-mod(t*${speed}\\,${safeW}+text_w)':y=45[ticker];[tickerbase][ticker]overlay=x=${safeX}:y=${safeY}:shortest=1[out]`;
  }
  return `${filter};[out0]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${wrappedPath||captionPath}:fontcolor=white:fontsize=${fontSize}:line_spacing=12:box=1:boxcolor=black@0.58:boxborderw=24:x=(w-text_w)/2:y=h-390[out]`;
-}
-
-function productVisualFilter(plan:RenderPlan,scene:Scene,hasAsset:boolean){
- const [base,accent]=templateColors(plan.template);
- const nonPuppet=/product|saas|ai|mobile/i.test(plan.template);
- if(!nonPuppet)return hasAsset?'[bg]null[out0]':`[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.35:t=fill[out0]`;
- if(!hasAsset)return `[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.34:t=fill[styled];[styled]drawbox=x=iw*.06:y=ih*.14:w=iw*.88:h=ih*.62:color=black@0.12:t=fill[out0]`;
- // Keep the real product visual prominent while adding a polished branded presentation layer.
- const cardW=/mobile/i.test(plan.template)?0.66:0.84; const cardH=/mobile/i.test(plan.template)?0.70:0.60;
- return `[bg]null[out0]`;
 }
 
 export async function renderScene(plan:RenderPlan,scene:Scene,index:number,outDir='./tmp/render'){
  await mkdir(outDir,{recursive:true}); const output=`${outDir}/${scene.id}.mp4`; const inputs:string[]=[]; const hasAsset=Boolean(scene.assetUrl);
  if(hasAsset)inputs.push('-stream_loop','-1','-i',scene.assetUrl!); else {const [c1]=templateColors(plan.template);inputs.push('-f','lavfi','-i',`color=c=${c1}:s=${plan.width}x${plan.height}:r=${plan.fps}`);}
- const d=Math.max(.2,scene.duration);
- let filter:string;
+ const d=Math.max(.2,scene.duration); let filter:string;
  if(hasAsset&&/product|saas|ai|mobile/i.test(plan.template)){
-   const [,accent]=templateColors(plan.template); const cardW=/mobile/i.test(plan.template)?0.66:0.84; const cardH=/mobile/i.test(plan.template)?0.70:0.60;
-   filter=`[0:v]split=2[rawbg][rawcard];[rawbg]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=increase,crop=${plan.width}:${plan.height},boxblur=18:2[bgblur];[bgblur]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.30:t=fill[bg];[rawcard]scale=w=${Math.round(plan.width*cardW)}:h=${Math.round(plan.height*cardH)}:force_original_aspect_ratio=decrease,pad=${Math.round(plan.width*cardW)}:${Math.round(plan.height*cardH)}:(ow-iw)/2:(oh-ih)/2:color=0x101010[card];[bg]drawbox=x=(iw-${Math.round(plan.width*cardW)})/2-18:y=(ih-${Math.round(plan.height*cardH)})/2-18:w=${Math.round(plan.width*cardW)+36}:h=${Math.round(plan.height*cardH)+36}:color=black@0.72:t=fill[frame];[frame][card]overlay=x=(W-w)/2:y=(H-h)/2:shortest=0[outbase]`;
+   const [,accent]=templateColors(plan.template); const cardW=/mobile/i.test(plan.template)?0.66:0.84; const cardH=/mobile/i.test(plan.template)?0.70:0.60; const cw=Math.round(plan.width*cardW); const ch=Math.round(plan.height*cardH);
+   filter=`[0:v]split=2[rawbg][rawcard];[rawbg]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=increase,crop=${plan.width}:${plan.height},boxblur=18:2[bgblur];[bgblur]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.30:t=fill[bg];[rawcard]scale=w=${cw}:h=${ch}:force_original_aspect_ratio=decrease,pad=${cw}:${ch}:(ow-iw)/2:(oh-ih)/2:color=0x101010[card];[bg]drawbox=x=(iw-${cw})/2-18:y=(ih-${ch})/2-18:w=${cw+36}:h=${ch+36}:color=black@0.72:t=fill[frame];[frame][card]overlay=x=(W-w)/2:y=(H-h)/2:shortest=0[outbase]`;
  } else {
    filter=`[0:v]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=decrease,pad=${plan.width}:${plan.height}:(ow-iw)/2:(oh-ih)/2[bg0]`;
-   if(hasAsset)filter+=`;[bg0]scale=w='iw*(1+0.055*t/${d})':h='ih*(1+0.055*t/${d})':eval=frame,crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`;
-   else filter+=';[bg0]null[bg]';
-   const [,accent]=templateColors(plan.template);
-   if(!hasAsset&&/product|saas|ai|mobile/i.test(plan.template))filter+=`;[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.35:t=fill[outbase]`; else filter+=';[bg]null[outbase]';
+   if(hasAsset)filter+=`;[bg0]scale=w='iw*(1+0.055*t/${d})':h='ih*(1+0.055*t/${d})':eval=frame,crop=${plan.width}:${plan.height}:(in_w-${plan.width})/2:(in_h-${plan.height})/2[bg]`; else filter+=';[bg0]null[bg]';
+   const [,accent]=templateColors(plan.template); if(!hasAsset&&/product|saas|ai|mobile/i.test(plan.template))filter+=`;[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.35:t=fill[outbase]`; else filter+=';[bg]null[outbase]';
  }
-
  if(scene.stickman&&scene.stickAction&&/puppet|stick|2d-story/i.test(plan.template)){
-   const frameDir=await makePuppetFrames(scene,outDir); inputs.push('-framerate','12','-i',`${frameDir}/frame-%04d.png`);
-   const enter=scene.stickAction==='presenting'||scene.stickAction==='walk'; const xExpr=enter?`(W-w)/2-260+min(260\\,260*t/${Math.min(.8,d)})`:`(W-w)/2`;
-   filter+=`;[1:v]scale=${Math.round(plan.width*.24)}:-1,format=rgba[char];[outbase][char]overlay=x='${xExpr}':y=H-h-70:shortest=0,fade=t=in:st=0:d=.16[out0]`;
- } else filter+=`;[outbase]fade=t=in:st=0:d=.16[out0]`;
-
+   const frameDir=await makePuppetFrames(scene,outDir); inputs.push('-framerate','12','-i',`${frameDir}/frame-%04d.png`); const enter=scene.stickAction==='presenting'||scene.stickAction==='walk'; const xExpr=enter?`(W-w)/2-260+min(260\\,260*t/${Math.min(.8,d)})`:`(W-w)/2`; filter+=`;[1:v]scale=${Math.round(plan.width*.24)}:-1,format=rgba[char];[outbase][char]overlay=x='${xExpr}':y=H-h-70:shortest=0,fade=t=in:st=.0:d=.16[out0]`;
+ } else filter+=';[outbase]fade=t=in:st=0:d=.16[out0]';
  let captionPath:string|undefined; let wrappedPath:string|undefined;
  if(scene.caption?.trim()){captionPath=`${outDir}/${scene.id}-caption.txt`;wrappedPath=`${outDir}/${scene.id}-caption-wrapped.txt`;await writeFile(captionPath,scene.caption.trim(),'utf8');await writeFile(wrappedPath,wrapText(scene.caption,plan.width>=1900?44:30),'utf8');filter=drawCaption(filter,captionPath,wrappedPath,plan,scene);}
- const brandPath=`${outDir}/${scene.id}-brand.txt`;await writeFile(brandPath,'LAUNCHFRAME AI','utf8');filter+=`;[${captionPath?'out':'out0'}]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${brandPath}:fontcolor=white@0.82:fontsize=${Math.max(22,Math.round(plan.width/55))}:x=${Math.round(plan.width*.06)}:y=${Math.round(plan.height*.055)}[final]`;
- await execFileAsync('ffmpeg',['-y',...inputs,'-t',String(scene.duration),'-filter_complex',filter,'-map','[final]','-an','-c:v','libx264','-preset','veryfast','-pix_fmt','yuv420p','-movflags','+faststart',output]);
- return output;
+ const brandPath=`${outDir}/${scene.id}-brand.txt`; await writeFile(brandPath,'LAUNCHFRAME AI','utf8'); filter+=`;[${captionPath?'out':'out0'}]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${brandPath}:fontcolor=white@0.82:fontsize=${Math.max(22,Math.round(plan.width/55))}:x=${Math.round(plan.width*.06)}:y=${Math.round(plan.height*.055)}[final]`;
+ await execFileAsync('ffmpeg',['-y',...inputs,'-t',String(scene.duration),'-filter_complex',filter,'-map','[final]','-an','-c:v','libx264','-preset','veryfast','-pix_fmt','yuv420p','-movflags','+faststart',output]); return output;
 }
 
 export async function concatScenes(sceneFiles:string[],output='./tmp/render/launchframe.mp4'){const list='./tmp/render/concat.txt';await mkdir('./tmp/render',{recursive:true});await writeFile(list,sceneFiles.map(file=>`file '${basename(file).replaceAll("'","'\\''")}'`).join('\n'),'utf8');await execFileAsync('ffmpeg',['-y','-f','concat','-safe','0','-i',list,'-c','copy','-movflags','+faststart',output]);return output;}

@@ -40,7 +40,7 @@ function drawCaption(filter:string,captionPath:string|undefined,wrappedPath:stri
 export async function renderScene(plan:RenderPlan,scene:Scene,index:number,outDir='./tmp/render'){
  await mkdir(outDir,{recursive:true}); const output=`${outDir}/${scene.id}.mp4`; const inputs:string[]=[]; const hasAsset=Boolean(scene.assetUrl);
  if(hasAsset)inputs.push('-stream_loop','-1','-i',scene.assetUrl!); else {const [c1]=templateColors(plan.template);inputs.push('-f','lavfi','-i',`color=c=${c1}:s=${plan.width}x${plan.height}:r=${plan.fps}`);}
- const d=Math.max(.2,scene.duration); let filter:string;
+ const d=Math.max(0.2,scene.duration); let filter:string;
  if(hasAsset&&/product|saas|ai|mobile/i.test(plan.template)){
    const [,accent]=templateColors(plan.template); const cardW=/mobile/i.test(plan.template)?0.66:0.84; const cardH=/mobile/i.test(plan.template)?0.70:0.60; const cw=Math.round(plan.width*cardW); const ch=Math.round(plan.height*cardH);
    filter=`[0:v]split=2[rawbg][rawcard];[rawbg]scale=${plan.width}:${plan.height}:force_original_aspect_ratio=increase,crop=${plan.width}:${plan.height},boxblur=18:2[bgblur];[bgblur]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.30:t=fill[bg];[rawcard]scale=w=${cw}:h=${ch}:force_original_aspect_ratio=decrease,pad=${cw}:${ch}:(ow-iw)/2:(oh-ih)/2:color=0x101010[card];[bg]drawbox=x=(iw-${cw})/2-18:y=(ih-${ch})/2-18:w=${cw+36}:h=${ch+36}:color=black@0.72:t=fill[frame];[frame][card]overlay=x=(W-w)/2:y=(H-h)/2:shortest=0[outbase]`;
@@ -50,8 +50,8 @@ export async function renderScene(plan:RenderPlan,scene:Scene,index:number,outDi
    const [,accent]=templateColors(plan.template); if(!hasAsset&&/product|saas|ai|mobile/i.test(plan.template))filter+=`;[bg]drawbox=x=0:y=0:w=iw:h=ih:color=${accent}@0.35:t=fill[outbase]`; else filter+=';[bg]null[outbase]';
  }
  if(scene.stickman&&scene.stickAction&&/puppet|stick|2d-story/i.test(plan.template)){
-   const frameDir=await makePuppetFrames(scene,outDir); inputs.push('-framerate','12','-i',`${frameDir}/frame-%04d.png`); const enter=scene.stickAction==='presenting'||scene.stickAction==='walk'; const xExpr=enter?`(W-w)/2-260+min(260\\,260*t/${Math.min(.8,d)})`:`(W-w)/2`; filter+=`;[1:v]scale=${Math.round(plan.width*.24)}:-1,format=rgba[char];[outbase][char]overlay=x='${xExpr}':y=H-h-70:shortest=0,fade=t=in:st=.0:d=.16[out0]`;
- } else filter+=';[outbase]fade=t=in:st=0:d=.16[out0]';
+   const frameDir=await makePuppetFrames(scene,outDir); inputs.push('-framerate','12','-i',`${frameDir}/frame-%04d.png`); const enter=scene.stickAction==='presenting'||scene.stickAction==='walk'; const xExpr=enter?`(W-w)/2-260+min(260\\,260*t/${Math.min(0.8,d)})`:`(W-w)/2`; filter+=`;[1:v]scale=${Math.round(plan.width*.24)}:-1,format=rgba[char];[outbase][char]overlay=x='${xExpr}':y=H-h-70:shortest=0,fade=t=in:st=0:d=0.16[out0]`;
+ } else filter+=';[outbase]fade=t=in:st=0:d=0.16[out0]';
  let captionPath:string|undefined; let wrappedPath:string|undefined;
  if(scene.caption?.trim()){captionPath=`${outDir}/${scene.id}-caption.txt`;wrappedPath=`${outDir}/${scene.id}-caption-wrapped.txt`;await writeFile(captionPath,scene.caption.trim(),'utf8');await writeFile(wrappedPath,wrapText(scene.caption,plan.width>=1900?44:30),'utf8');filter=drawCaption(filter,captionPath,wrappedPath,plan,scene);}
  const brandPath=`${outDir}/${scene.id}-brand.txt`; await writeFile(brandPath,'LAUNCHFRAME AI','utf8'); filter+=`;[${captionPath?'out':'out0'}]drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=${brandPath}:fontcolor=white@0.82:fontsize=${Math.max(22,Math.round(plan.width/55))}:x=${Math.round(plan.width*.06)}:y=${Math.round(plan.height*.055)}[final]`;

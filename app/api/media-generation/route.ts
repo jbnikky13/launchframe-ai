@@ -1,0 +1,3 @@
+import {NextResponse} from 'next/server';
+import {buildMediaGenerationJobs,getGenerationCapabilities} from '@/lib/media-generation';
+export async function POST(request:Request){try{const body=await request.json();if(!Array.isArray(body?.scenes)||!body.scenes.length)return NextResponse.json({error:'Media scenes are required.'},{status:400});const jobs=buildMediaGenerationJobs(body);return NextResponse.json({jobs,capabilities:getGenerationCapabilities(),providerConfigurationRequired:jobs.some(j=>j.kind==='image'&&body.scenes.some((s:any)=>!s.useSourceAsset))||jobs.some(j=>j.kind==='voice'||j.kind==='music')});}catch(error){return NextResponse.json({error:error instanceof Error?error.message:'Media generation planning failed.'},{status:422});}}

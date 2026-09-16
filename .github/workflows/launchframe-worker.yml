@@ -1,20 +1,19 @@
 name: LaunchFrame Worker
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'worker/**'
-      - '.github/workflows/launchframe-worker.yml'
   repository_dispatch:
     types: [launchframe-render]
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+# Each dispatched render gets its own concurrency group, while the 5-minute
+# sweeper is serialized separately. This prevents one render from stealing
+# another render's job while still allowing independent user renders to run.
 concurrency:
-  group: launchframe-render-${{ github.event.client_payload.job_id || github.run_id }}
+  group: ${{ github.event_name == 'repository_dispatch' && format('launchframe-job-{0}', github.event.client_payload.job_id) || 'launchframe-sweeper' }}
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
@@ -40,7 +39,9 @@ jobs:
       - name: Install rendering dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg librsvg2-bin fonts-dejavu chromium
+          sudo apt-get install -y --no-install-recommends ffmpeg librsvg2-bin fonts-dejavu
+          ffmpeg -version | head -n 1
+          rsvg-convert --version
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -49,15 +50,17 @@ jobs:
 
       - name: Install worker dependencies
         working-directory: worker
-        run: npm install --omit=dev
+        run: npm install --omit=dev --no-audit --no-fund
 
       - name: Process render immediately
         working-directory: worker
-        run: npx tsx run-once.ts
         env:
+          JOB_ID: ${{ github.event.client_payload.job_id }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_TTS_MODEL: ${{ secrets.GEMINI_TTS_MODEL }}
           GEMINI_TTS_VOICE: ${{ secrets.GEMINI_TTS_VOICE }}
           VOICE_VOLUME: ${{ secrets.VOICE_VOLUME }}
+          MUSIC_VOLUME: ${{ secrets.MUSIC_VOLUME }}
+        run: npx tsx run-once.ts

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return NextResponse.json({ error: 'Server configuration missing.' }, { status: 500 });
+  if (!url || !key) return NextResponse.json({ error: 'Server configuration missing.' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
 
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await db
@@ -13,32 +16,17 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
 
   const jobs = await Promise.all((data ?? []).map(async (job) => {
     let download_url: string | null = null;
     if (job.status === 'completed') {
-      const signed = await db.storage
-        .from('launchframe-renders')
-        .createSignedUrl(`renders/${job.id}.mp4`, 86400, { download: `launchframe-${job.id}.mp4` });
+      const signed = await db.storage.from('launchframe-renders').createSignedUrl(`renders/${job.id}.mp4`, 86400, { download: `launchframe-${job.id}.mp4` });
       if (!signed.error) download_url = signed.data.signedUrl;
     }
-
     const plan = job.render_plan as { width?: number; height?: number; totalDuration?: number; duration?: number } | null;
-    return {
-      id: job.id,
-      status: job.status,
-      progress: job.progress,
-      output_url: job.output_url,
-      download_url,
-      error: job.error,
-      created_at: job.created_at,
-      updated_at: job.updated_at,
-      width: plan?.width ?? 0,
-      height: plan?.height ?? 0,
-      duration: plan?.totalDuration ?? plan?.duration ?? 0,
-    };
+    return { id: job.id, status: job.status, progress: job.progress, output_url: job.output_url, download_url, error: job.error, created_at: job.created_at, updated_at: job.updated_at, width: plan?.width ?? 0, height: plan?.height ?? 0, duration: plan?.totalDuration ?? plan?.duration ?? 0 };
   }));
 
-  return NextResponse.json({ jobs });
+  return NextResponse.json({ jobs }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
 }

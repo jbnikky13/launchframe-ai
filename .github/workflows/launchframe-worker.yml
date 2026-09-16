@@ -7,9 +7,6 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
-# Each dispatched render gets its own concurrency group, while the 5-minute
-# sweeper is serialized separately. This prevents one render from stealing
-# another render's job while still allowing independent user renders to run.
 concurrency:
   group: ${{ github.event_name == 'repository_dispatch' && format('launchframe-job-{0}', github.event.client_payload.job_id) || 'launchframe-sweeper' }}
   cancel-in-progress: false
@@ -21,7 +18,7 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout latest main

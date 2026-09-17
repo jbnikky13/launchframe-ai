@@ -13,8 +13,8 @@ function noStore(body: unknown, init?: ResponseInit) {
 }
 
 class WorkerDispatchTimeout extends Error {
-  constructor() {
-    super('Render worker dispatch timed out. The job remains queued and the worker sweeper will pick it up automatically.');
+  constructor(message = 'Render worker dispatch timed out. The job remains queued and the worker sweeper will pick it up automatically.') {
+    super(message);
     this.name = 'WorkerDispatchTimeout';
   }
 }
@@ -22,7 +22,7 @@ class WorkerDispatchTimeout extends Error {
 async function triggerRenderWorker(jobId: string) {
   const token = process.env.GITHUB_WORKER_TOKEN;
   const repo = process.env.GITHUB_WORKER_REPO || 'jbnikky13/launchframe-ai';
-  if (!token) throw new Error('Render worker is not configured: GITHUB_WORKER_TOKEN is missing.');
+  if (!token) throw new WorkerDispatchTimeout('Render worker dispatch is not configured. The job remains queued and the scheduled worker will pick it up automatically.');
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -41,9 +41,13 @@ async function triggerRenderWorker(jobId: string) {
     });
     if (!response.ok) {
       const detail = await response.text();
+      if (response.status === 401 || response.status === 403 || response.status === 408 || response.status === 429 || response.status >= 500) {
+        throw new WorkerDispatchTimeout(`Render worker could not be triggered (${response.status}). The job remains queued and the scheduled worker will pick it up automatically.`);
+      }
       throw new Error(`Render worker dispatch failed (${response.status}). ${detail.slice(0, 300)}`);
     }
   } catch (error) {
+    if (error instanceof WorkerDispatchTimeout) throw error;
     if (error instanceof Error && error.name === 'AbortError') throw new WorkerDispatchTimeout();
     throw error;
   } finally {
@@ -91,9 +95,7 @@ export async function POST(request: Request) {
       await triggerRenderWorker(verified.id);
     } catch (dispatchError) {
       if (dispatchError instanceof WorkerDispatchTimeout) {
-        // Do not turn a network timeout into a false failure. The scheduled
-        // sweeper will claim this still-queued job within five minutes.
-        console.warn('[LaunchFrame render] Worker dispatch timed out; leaving job queued.', { jobId: verified.id });
+        console.warn('[LaunchFrame render] Worker dispatch unavailable; leaving job queued.', { jobId: verified.id });
         return noStore({
           job: { ...data, format: body.videoPlan.format, width: renderPlan.width, height: renderPlan.height, duration: renderPlan.duration },
           message: 'Render queued. The worker will continue automatically.',

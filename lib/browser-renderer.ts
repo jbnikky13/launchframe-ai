@@ -307,9 +307,11 @@ export async function renderInBrowser(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas rendering is unavailable.');
 
-  const totalDuration =
-    plan.duration ||
-    plan.scenes.reduce((sum, scene) => sum + Math.max(.1, scene.duration), 0);
+  if (!plan.scenes.length) throw new Error('The visual story has no scenes to render. Build the visual story again.');
+  const totalDuration = Math.max(
+    0.1,
+    plan.duration || plan.scenes.reduce((sum, scene) => sum + Math.max(0.1, scene.duration), 0),
+  );
 
   options.onProgress?.(2, 'Checking browser video encoder…');
 

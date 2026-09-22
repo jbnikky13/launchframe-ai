@@ -71,8 +71,9 @@ function drawCover(
   scale = 1,
   alpha = 1,
 ) {
-  const sourceWidth = 'naturalWidth' in image ? Number(image.naturalWidth) : Number((image as HTMLImageElement).width);
-  const sourceHeight = 'naturalHeight' in image ? Number(image.naturalHeight) : Number((image as HTMLImageElement).height);
+  const source = image as CanvasImageSource & { naturalWidth?: number; naturalHeight?: number; width?: number; height?: number };
+  const sourceWidth = Number(source.naturalWidth ?? source.width ?? 0);
+  const sourceHeight = Number(source.naturalHeight ?? source.height ?? 0);
   if (!sourceWidth || !sourceHeight) return;
 
   const cover = Math.max(canvasWidth / sourceWidth, canvasHeight / sourceHeight) * scale;
@@ -213,12 +214,9 @@ function drawGeneratedBackdrop(
     ctx.fill();
   }
 
-  if (scene.visualPrompt) {
-    ctx.fillStyle = 'rgba(255,255,255,.45)';
-    ctx.font = '500 22px Inter, Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(scene.visualPrompt.slice(0, 80), width / 2, height * 0.58);
-  }
+  // Keep generated backdrops intentionally visual-only. The scene's
+  // narration/caption is rendered separately so we never depend on fields
+  // that are not part of BrowserRenderScene.
 }
 
 function drawScene(
@@ -301,9 +299,11 @@ export async function renderInBrowser(
   }
 
   const fps = Math.max(12, Math.min(30, plan.fps || 30));
+  const width = Math.max(2, Math.floor(plan.width));
+  const height = Math.max(2, Math.floor(plan.height));
   const canvas = document.createElement('canvas');
-  canvas.width = plan.width;
-  canvas.height = plan.height;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas rendering is unavailable.');
 
@@ -313,16 +313,17 @@ export async function renderInBrowser(
 
   options.onProgress?.(2, 'Checking browser video encoder…');
 
+  const outputFormat = new Mp4OutputFormat({ fastStart: 'in-memory' });
   const codec = await getFirstEncodableVideoCodec(
-    ['avc', 'vp9', 'vp8'],
-    { width: plan.width, height: plan.height },
+    outputFormat.getSupportedVideoCodecs(),
+    { width, height, frameRate: fps, quality: new Quality('high') },
   );
   if (!codec) {
     throw new Error('This browser cannot encode a supported video format at this resolution.');
   }
 
   const output = new Output({
-    format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
+    format: outputFormat,
     target: new BufferTarget(),
   });
 
@@ -348,7 +349,6 @@ export async function renderInBrowser(
     if (asset) assets.set(asset.url, asset.image);
   }
 
-  let start = 0;
   let frameNumber = 0;
 
   try {
@@ -359,7 +359,7 @@ export async function renderInBrowser(
 
       for (let frame = 0; frame < frameCount; frame++) {
         const localProgress = frameCount <= 1 ? 1 : frame / (frameCount - 1);
-        drawScene(ctx, plan.width, plan.height, scene, image, localProgress);
+        drawScene(ctx, width, height, scene, image, localProgress);
 
         const timestamp = frameNumber / fps;
         await videoSource.add(timestamp, 1 / fps);
@@ -372,7 +372,6 @@ export async function renderInBrowser(
         );
       }
 
-      start += duration;
     }
 
     options.onProgress?.(97, 'Finalizing MP4…');

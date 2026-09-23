@@ -29,7 +29,7 @@ export async function generateSceneMedia(scene:Scene, width:number, height:numbe
   if(!file.ok) throw Error(`Generated video download failed (${file.status}).`);
   const path=`${outDir}/${scene.id}.mp4`; await writeFile(path,Buffer.from(await file.arrayBuffer())); return path;
  }
- const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],responseMimeType:'image/png',response_format:{image:{aspect_ratio:ratio(width,height)}}})});
+ const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],response_format:{image:{aspect_ratio:ratio(width,height)}}})});
  const payload=await response.json().catch(()=>null) as any;
  if(!response.ok) throw Error(payload?.error?.message||`Image generation failed (${response.status}).`);
  const part=payload?.candidates?.[0]?.content?.parts?.find((p:any)=>p.inlineData?.data||p.inline_data?.data);

@@ -15,8 +15,12 @@ export type VideoScene = {
   characterStyle:CharacterStyle;
   characterAction?:StickAction;
   character?:ReturnType<typeof createStickCharacter>;
+  visualMode?:'source'|'image'|'video'|'diagram'|'text';
+  visualPrompt?:string;
+  motion?:'push-in'|'pull-out'|'pan'|'parallax'|'static';
+  transition?:'fade'|'slide'|'zoom'|'cut'|'match-cut';
 };
-export type VideoPlan = { format:VideoFormat; template:string; width:number; height:number; totalDuration:number; scenes:VideoScene[] };
+export type VideoPlan = { format:VideoFormat; template:string; width:number; height:number; totalDuration:number; scenes:VideoScene[]; mediaScenes?:Array<{id:string;prompt:string;useSourceAsset:boolean;motion:'push-in'|'pull-out'|'pan'|'parallax'|'static';transition:'fade'|'slide'|'zoom'|'cut'|'match-cut';visualMode?:string}> };
 const dimensions:Record<VideoFormat,[number,number]>={vertical:[1080,1920],horizontal:[1920,1080],square:[1080,1080]};
 
 export function createVideoPlan(input:{format:VideoFormat;template:string;scenes:Array<{order:number;duration:number;purpose:string;narration:string;visual:string;onScreenText:string}>;assetUrls?:string[]}):VideoPlan {
@@ -28,13 +32,13 @@ export function createVideoPlan(input:{format:VideoFormat;template:string;scenes
    if(assetIndex>=0) used.add(assetIndex);
    return {
      id:`scene-${scene.order}`,duration:scene.duration,purpose:scene.purpose,narration:scene.narration,visual:scene.visual,
-     onScreenText:scene.onScreenText,assetUrl:assetIndex>=0?assets[assetIndex]:undefined,
+     onScreenText:scene.onScreenText,assetUrl:assetIndex>=0?assets[assetIndex]:undefined,visualMode:scene.visualMode||'source',visualPrompt:scene.visual, motion:scene.camera==='pan-left'||scene.camera==='pan-right'?'pan':scene.camera, transition:scene.transition,
      assetRole:assetIndex>=0?classifyAsset(assets[assetIndex], scene, index):undefined,
      characterStyle:action ? 'stick' : 'none',characterAction:action||undefined,
      character:action?createStickCharacter(action,index):undefined
    };
  });
- return {format:input.format,template:input.template,width,height,totalDuration:scenes.reduce((sum,s)=>sum+s.duration,0),scenes};
+ const mediaScenes=scenes.map(s=>({id:s.id,prompt:s.visualPrompt||s.visual,useSourceAsset:s.visualMode==='source',motion:s.motion||'static',transition:s.transition||'cut',visualMode:s.visualMode||'source'})); return {format:input.format,template:input.template,width,height,totalDuration:scenes.reduce((sum,s)=>sum+s.duration,0),scenes,mediaScenes};
 }
 
 function classifyAsset(url:string, scene:{purpose:string;narration:string;visual:string;onScreenText:string}, index:number):AssetRole {

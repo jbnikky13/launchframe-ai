@@ -23,7 +23,7 @@ export type VideoScene = {
 export type VideoPlan = { format:VideoFormat; template:string; width:number; height:number; totalDuration:number; scenes:VideoScene[]; mediaScenes?:Array<{id:string;prompt:string;useSourceAsset:boolean;motion:'push-in'|'pull-out'|'pan'|'parallax'|'static';transition:'fade'|'slide'|'zoom'|'cut'|'match-cut';visualMode?:string}> };
 const dimensions:Record<VideoFormat,[number,number]>={vertical:[1080,1920],horizontal:[1920,1080],square:[1080,1080]};
 
-export function createVideoPlan(input:{format:VideoFormat;template:string;scenes:Array<{order:number;duration:number;purpose:string;narration:string;visual:string;onScreenText:string}>;assetUrls?:string[]}):VideoPlan {
+export function createVideoPlan(input:{format:VideoFormat;template:string;scenes:Array<{order:number;duration:number;purpose:string;narration:string;visual:string;onScreenText:string;visualMode?:'source'|'image'|'video'|'diagram'|'text';camera?:'push-in'|'pull-out'|'pan-left'|'pan-right'|'parallax'|'static';transition?:'fade'|'slide'|'zoom'|'cut'|'match-cut'}>;assetUrls?:string[]}):VideoPlan {
  const [width,height]=dimensions[input.format]; const assets=input.assetUrls||[]; const puppetTemplate=/puppet|stick|2d-story/i.test(input.template);
  const used=new Set<number>();
  const scenes: VideoScene[] = input.scenes.map((scene,index)=>{

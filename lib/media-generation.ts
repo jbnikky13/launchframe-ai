@@ -13,4 +13,4 @@ export function buildMediaGenerationJobs(input:{scenes:Scene[];voice?:string;mus
  if(input.musicMood)jobs.push({id:'campaign-music',kind:'music',text:input.musicMood,duration:Math.max(1,input.scenes.reduce((n,s)=>n+s.duration,0)),outputFormat:'wav'});
  return jobs;
 }
-export function getGenerationCapabilities(){return {image:Boolean(process.env.IMAGE_PROVIDER||process.env.GEMINI_API_KEY),video:Boolean(process.env.VIDEO_PROVIDER),voice:Boolean(process.env.VOICE_PROVIDER||process.env.GEMINI_API_KEY),music:Boolean(process.env.MUSIC_PROVIDER),sfx:Boolean(process.env.SFX_PROVIDER)};}
+export function getGenerationCapabilities(){return {image:Boolean(process.env.IMAGE_PROVIDER||process.env.GEMINI_API_KEY),video:Boolean(process.env.VIDEO_PROVIDER||process.env.GEMINI_API_KEY),voice:Boolean(process.env.VOICE_PROVIDER||process.env.GEMINI_API_KEY),music:Boolean(process.env.MUSIC_PROVIDER),sfx:Boolean(process.env.SFX_PROVIDER)};}
